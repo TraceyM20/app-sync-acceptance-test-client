@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>nz.vts.nep.build</groupId>
+        <artifactId>aws-lambda-parent</artifactId>
+        <version>2.23.0</version>
+        <relativePath />
+    </parent>
+
+    <groupId>nz.vts.nep.template</groupId>
+    <artifactId>api</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+
+    <properties>
+        <aws-serverless.version>1.6</aws-serverless.version>
+        <codegen.version>1.10</codegen.version>
+        <dagger.version>2.37</dagger.version>
+        <shared-components.version>1.91.0</shared-components.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>nz.vts.nep.core</groupId>
+            <artifactId>shared-components-common</artifactId>
+            <version>${shared-components.version}</version>
+        </dependency>
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>5.2.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>nz.vts.nep.build.tools</groupId>
+                        <artifactId>nep-rest-client-generator</artifactId>
+                        <version>${codegen.version}</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi.yaml</inputSpec>
+                            <generatorName>nep-rest-client</generatorName>
+                            <output>${project.build.directory}/generated-sources</output>
+                            <apiPackage>${project.groupId}.hello.api</apiPackage>
+                            <modelPackage>${project.groupId}.hello.model</modelPackage>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>generate-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/src/main/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-test-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/src/test/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

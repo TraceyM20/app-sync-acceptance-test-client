@@ -1,0 +1,16 @@
+{
+  "service_name": "${service_name}",
+  "cost_group": "${cost_group}",
+  "created_by": "terraform: build pipeline",
+  "environment": "${environment}",
+  "log_level": "DEBUG",
+  "log_retention_days": ${log_retention_days},
+  "components": {
+    "${component_name}": {
+      "component_name": "${component_name}",
+      "component_version": "$${MAVEN_VERSION_NUMBER}",
+      "terraform_version": "${terraform_version}",
+      "extra_config": "config-new-project-template.json"
+    }
+  }
+}

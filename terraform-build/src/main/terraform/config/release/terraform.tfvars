@@ -1,0 +1,14 @@
+service_name                        = "${service_name}"
+component_name                      = "${component_name}"
+environment                         = "${environment}"
+environment_remote_state_bucket_arn = "${environment_remote_state_bucket_arn}"
+environment_remote_state_table_arn  = "${environment_remote_state_table_arn}"
+management_kms_arn                  = "${management_kms_arn}"
+application_kms_arn                 = "${application_kms_arn}"
+config_s3_name                      = "${config_s3_name}"
+application_config_path             = "${application_config_path}"
+cost_group                          = "${cost_group}"
+created_by                          = "terraform: build pipeline"
+owner                               = "${owner}"
+log_retention_days                  = ${log_retention_days}
+smoke_parameter_store_values        = ${smoke_parameter_store_values}

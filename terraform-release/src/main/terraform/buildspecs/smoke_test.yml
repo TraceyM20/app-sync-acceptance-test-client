@@ -1,0 +1,13 @@
+version: 0.2
+
+env:
+  variables:
+    SPRING_PROFILES_ACTIVE: ${environment}
+    TEST_APPLICATION_NAME: ${application_name}
+    AWS_IAM_ROLE: ${role_arn}
+    JAR_NAME: "smoke-*.jar"
+
+phases:
+  build:
+    commands:
+      - java -jar `find . -name $JAR_NAME | sort | tail -f`

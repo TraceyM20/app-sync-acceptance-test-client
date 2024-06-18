@@ -1,0 +1,29 @@
+version: 0.2
+
+env:
+  variables:
+    RELEASE_BUCKET_NAME: ${release_bucket_name}
+    TERRAFORM_VERSION: ${terraform_version}
+    TERRAFORM_ACCEPTANCE_ARTIFACT_NAME: "terraform-acceptance-*-deploy.zip"
+
+phases:
+  install:
+    commands:
+      - aws s3 cp --no-progress s3://$${RELEASE_BUCKET_NAME}/dependencies/bin/terraform-$${TERRAFORM_VERSION} terraform
+      - chmod +x terraform
+      - mv terraform /usr/bin
+      - mkdir terraform-acceptance
+      - unzip `find . -name $${TERRAFORM_ACCEPTANCE_ARTIFACT_NAME} | sort | tail -1` -d terraform-acceptance
+      - >
+        cat > terraform-acceptance/terraform.tf << EOF
+          ${terraform_tf}
+        EOF
+      - >
+        cat > terraform-acceptance/terraform.tfvars << EOF
+          ${terraform_tfvars}
+        EOF
+  build:
+    commands:
+      - cd terraform-acceptance
+      - terraform init
+      - terraform apply -auto-approve

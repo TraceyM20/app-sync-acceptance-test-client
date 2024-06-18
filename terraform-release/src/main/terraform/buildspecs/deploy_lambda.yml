@@ -1,0 +1,28 @@
+version: 0.2
+
+env:
+  variables:
+    # LAMBDA_ARN: is set as an environment variable by the code pipeline
+    ZIP_NAME: "${source_name}-*-application.zip"
+    NUMBER_OF_VERSIONS_TO_KEEP: ${number_of_versions_to_keep}
+    LAMBDA_ALIAS_NAME: "action-target"
+    # This sets the number of retries AWS cli calls will make. By default, it is 2 which can not be enough if we run into AWS
+    # throttling exceptions when lots of release pipelines are all trying to update resources at the same time.
+    AWS_MAX_ATTEMPTS: ${max_deployment_attempts}
+
+phases:
+  build:
+    commands:
+      - >
+        aws lambda update-function-code --function-name $LAMBDA_ARN
+        --zip-file fileb://`find . -name $ZIP_NAME | sort | tail -1`
+      - >
+        aws lambda wait function-updated --function-name $LAMBDA_ARN
+      - >
+        VERSION=$(aws lambda publish-version --function-name $LAMBDA_ARN | jq -r .Version)
+      - >
+        aws lambda update-alias --function-name $LAMBDA_ARN --name $LAMBDA_ALIAS_NAME --function-version $VERSION
+      - >
+        aws lambda list-versions-by-function --function-name $LAMBDA_ARN
+        | jq -r '[.Versions | .[] | select(.Version != "$LATEST") | {Version: .Version | tonumber}] | sort_by(.Version) | .[:-(env.NUMBER_OF_VERSIONS_TO_KEEP  | tonumber)] | .[] | .Version'
+        | xargs -L1 -r aws lambda delete-function --function-name $LAMBDA_ARN --qualifier

@@ -1,0 +1,21 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo "ACTOR_ACCOUNT_ID=$${CODEBUILD_WEBHOOK_ACTOR_ACCOUNT_ID}"
+      - ls -al
+      - >
+        if [ -z $${CODEBUILD_WEBHOOK_HEAD_REF} ]; then
+          export GIT_BRANCH=$${CODEBUILD_SOURCE_VERSION};
+        else
+          export GIT_BRANCH=`echo $${CODEBUILD_WEBHOOK_HEAD_REF} | xargs basename`;
+        fi
+      - >
+        echo "Switching to branch: $${GIT_BRANCH}"
+      - git checkout $${GIT_BRANCH}
+      - git branch -u origin/$${GIT_BRANCH}
+
+artifacts:
+  files:
+    - '**/*'

@@ -1,0 +1,24 @@
+version: 0.2
+
+env:
+  variables:
+    # API_GATEWAY_ID: is set as an environment variable by the code pipeline
+    # API_GATEWAY_STAGE_NAME: is set as an environment variable by the code pipeline
+    COMPONENT_NAME: ${component_name}
+    NUMBER_OF_DEPLOYMENTS_TO_KEEP: ${number_of_api_deployments_to_keep}
+    # This sets the number of retries AWS cli calls will make. By default, it is 2 which can not be enough if we run into AWS
+    # throttling exceptions when lots of release pipelines are all trying to update resources at the same time.
+    AWS_MAX_ATTEMPTS: ${max_deployment_attempts}
+
+phases:
+  pre_build:
+    commands:
+      - VERSION=$(cat release-properties.json | jq -r .components.\"$${COMPONENT_NAME}\".component_version)
+      - DESCRIPTION=$${COMPONENT_NAME}-$${VERSION}
+  build:
+    commands:
+      - aws apigateway create-deployment --rest-api-id $${API_GATEWAY_ID} --stage-name $${API_GATEWAY_STAGE_NAME} --description $${DESCRIPTION}
+      - >
+        aws apigateway get-deployments --rest-api-id $${API_GATEWAY_ID}
+        | jq -r '.[] | sort_by(.createdDate) | .[1:-(env.NUMBER_OF_DEPLOYMENTS_TO_KEEP | tonumber)] | .[] | .id'
+        | xargs -L1 -r aws apigateway delete-deployment --rest-api-id $${API_GATEWAY_ID} --deployment-id

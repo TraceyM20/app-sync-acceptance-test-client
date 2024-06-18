@@ -1,0 +1,53 @@
+version: 0.2
+
+env:
+  git-credential-helper: yes
+  variables:
+    APPLICATION_NAME: ${application_name}
+    TARGET_PATH: "*target/checkout/*"
+    ARTIFACT_IGNORED_NAME: "*sources*"
+    TERRAFORM_ARTIFACT_NAME: "*-deploy.zip"
+    LAMBDA_ARTIFACT_NAME: "*-application.zip"
+
+  secrets-manager:
+    MAVEN_SETTINGS_PATH: ${maven_settings_path}
+    JFROG_RELEASE_REPO: ${jfrog_secret_release_repo}
+    JFROG_SNAPSHOT_REPO: ${jfrog_secret_snapshot_repo}
+    JFROG_RELEASE_LOCAL_REPO: ${jfrog_secret_release_local_repo}
+    JFROG_SNAPSHOT_LOCAL_REPO: ${jfrog_secret_snapshot_local_repo}
+    JFROG_USERNAME: ${jfrog_secret_username}
+    JFROG_TOKEN: ${jfrog_secret_token}
+    GIT_USER_NAME: ${git_user_name}
+    GIT_USER_EMAIL: ${git_user_email}
+  exported-variables:
+    - VERSION_NUMBER
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+    commands:
+      - mkdir -p ~/.m2
+      - aws s3 cp $${MAVEN_SETTINGS_PATH} ~/.m2/settings.xml
+      - git config user.name "$${GIT_USER_NAME}"
+      - git config user.email "$${GIT_USER_EMAIL}"
+  build:
+    commands:
+      - mvn clean release:clean release:prepare -B
+      - mvn release:perform -Dmaven.test.skip=true -Darguments="-Dmaven.test.skip=true -Dmaven.javadoc.skip=true"
+  post_build:
+    commands:
+      - git reset --hard HEAD~1
+      - export VERSION_NUMBER=`mvn exec:exec -Dexec.executable=echo -Dexec.args='$${project.version}' --non-recursive --quiet`
+      - export RELEASE_DIRECTORY=release/$${APPLICATION_NAME}/$${VERSION_NUMBER}
+      - mkdir -p $${RELEASE_DIRECTORY}
+      - mv `find -path "$${TARGET_PATH}" -name "$${TERRAFORM_ARTIFACT_NAME}" -not -name "$${ARTIFACT_IGNORED_NAME}" -type f` $${RELEASE_DIRECTORY}/
+      - mv `find -path "$${TARGET_PATH}" -name "$${LAMBDA_ARTIFACT_NAME}" -not -name "$${ARTIFACT_IGNORED_NAME}" -type f` $${RELEASE_DIRECTORY}/
+
+cache:
+  paths:
+    - '/root/.m2/**/*'
+
+artifacts:
+  files:
+    - '$${RELEASE_DIRECTORY}/**/*'

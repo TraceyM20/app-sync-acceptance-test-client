@@ -1,0 +1,53 @@
+version: 0.2
+
+env:
+  variables:
+    COMPONENT_NAME: ${component_name}
+    TARGET_PATH: "*/target/*"
+    ARTIFACT_IGNORED_NAME: "*sources*"
+    TERRAFORM_ARTIFACT_NAME: "*-deploy.zip"
+    LAMBDA_ARTIFACT_NAME: "*-application.zip"
+    SMOKE_TEST_ARTIFACT_NAME: "smoke-*.jar"
+  secrets-manager:
+    MAVEN_SETTINGS_PATH: ${maven_settings_path}
+    JFROG_RELEASE_REPO: ${jfrog_secret_release_repo}
+    JFROG_SNAPSHOT_REPO: ${jfrog_secret_snapshot_repo}
+    JFROG_RELEASE_LOCAL_REPO: ${jfrog_secret_release_local_repo}
+    JFROG_SNAPSHOT_LOCAL_REPO: ${jfrog_secret_snapshot_local_repo}
+    JFROG_USERNAME: ${jfrog_secret_username}
+    JFROG_TOKEN: ${jfrog_secret_token}
+  exported-variables:
+    - VERSION_NUMBER
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+    commands:
+      - mkdir -p ~/.m2
+      - aws s3 cp $${MAVEN_SETTINGS_PATH} ~/.m2/settings.xml
+  build:
+    commands:
+      - mvn clean package
+  post_build:
+    commands:
+      - export VERSION_NUMBER=`mvn exec:exec -Dexec.executable=echo -Dexec.args='$${project.version}' --non-recursive --quiet`
+      - export RELEASE_DIRECTORY=release/$${COMPONENT_NAME}/$${VERSION_NUMBER}
+      - mkdir -p $${RELEASE_DIRECTORY}
+      - mv `find -path "$${TARGET_PATH}" -name "$${TERRAFORM_ARTIFACT_NAME}" -not -name "$${ARTIFACT_IGNORED_NAME}" -type f` $${RELEASE_DIRECTORY}/
+      - mv `find -path "$${TARGET_PATH}" -name "$${LAMBDA_ARTIFACT_NAME}" -not -name "$${ARTIFACT_IGNORED_NAME}" -type f` $${RELEASE_DIRECTORY}/
+
+cache:
+  paths:
+    - '/root/.m2/**/*'
+
+artifacts:
+  secondary-artifacts:
+    SnapshotArtifacts:
+      files:
+        - '$${RELEASE_DIRECTORY}/**/*'
+    SnapshotArtifactsAll:
+      exclude-paths:
+        - 'release/**/*'
+      files:
+        - '**/*'

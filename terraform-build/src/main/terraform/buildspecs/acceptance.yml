@@ -1,0 +1,30 @@
+version: 0.2
+
+env:
+  variables:
+    ACCEPTANCE_MODULE: ${acceptance_module}
+    ACCEPTANCE_PROFILE: acceptance-${environment}
+    AWS_IAM_ROLE: ${role_arn}
+  secrets-manager:
+    MAVEN_SETTINGS_PATH: ${maven_settings_path}
+    JFROG_RELEASE_REPO: ${jfrog_secret_release_repo}
+    JFROG_SNAPSHOT_REPO: ${jfrog_secret_snapshot_repo}
+    JFROG_RELEASE_LOCAL_REPO: ${jfrog_secret_release_local_repo}
+    JFROG_SNAPSHOT_LOCAL_REPO: ${jfrog_secret_snapshot_local_repo}
+    JFROG_USERNAME: ${jfrog_secret_username}
+    JFROG_TOKEN: ${jfrog_secret_token}
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+    commands:
+      - mkdir -p ~/.m2
+      - aws s3 cp $${MAVEN_SETTINGS_PATH} ~/.m2/settings.xml
+  build:
+    commands:
+      - mvn clean verify --also-make --projects $ACCEPTANCE_MODULE --activate-profiles $ACCEPTANCE_PROFILE
+
+cache:
+  paths:
+    - '/root/.m2/**/*'

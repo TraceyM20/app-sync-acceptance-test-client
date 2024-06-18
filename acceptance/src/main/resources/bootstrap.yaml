@@ -1,0 +1,7 @@
+aws:
+  paramstore:
+    enabled: true
+    name: vts-nep-operation-base
+    defaultContext: build-acceptance
+    prefix:
+    profile-separator: '-'

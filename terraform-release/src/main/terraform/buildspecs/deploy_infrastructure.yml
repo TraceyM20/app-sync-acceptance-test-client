@@ -1,0 +1,34 @@
+version: 0.2
+
+env:
+  variables:
+    TERRAFORM_APPLICATION_ARTIFACT_NAME: "terraform-application-*-deploy.zip"
+  exported-variables:
+    - HELLO_LAMBDA_ARN
+    - BASE_API_GATEWAY_ID
+    - BASE_API_GATEWAY_STAGE_NAME
+
+phases:
+  install:
+    commands:
+      - chmod +x terraform
+      - mv terraform /usr/bin
+      - mkdir terraform-application
+      - unzip `find . -name $${TERRAFORM_APPLICATION_ARTIFACT_NAME} | sort | tail -1` -d terraform-application
+      - mv app_terraform.tf ./terraform-application/terraform.tf
+      - for key in $(cat config-new-project-template.json | jq -r 'keys | .[]');
+        do
+          value=$(jq '.'\"$key\" config-new-project-template.json);
+          echo "$key = $value" >> terraform-application/terraform.tfvars;
+        done
+  build:
+    commands:
+      - cd terraform-application
+      - terraform init
+      - terraform apply -auto-approve
+  post_build:
+    commands:
+      - terraform output -json > remote-state.json
+      - export HELLO_LAMBDA_ARN=$(cat remote-state.json | jq -r .hello_lambda_arn.value)
+      - export BASE_API_GATEWAY_ID=$(cat remote-state.json | jq -r .base_api_gateway_id.value)
+      - export BASE_API_GATEWAY_STAGE_NAME=$(cat remote-state.json | jq -r .base_api_gateway_stage_name.value)

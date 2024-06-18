@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>nz.vts.nep.build</groupId>
+        <version>2.23.0</version>
+        <artifactId>parent</artifactId>
+    </parent>
+
+    <groupId>nz.vts.nep.template</groupId>
+    <artifactId>new-project-template-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>New Energy Platform - Project Template Parent</name>
+
+    <modules>
+        <module>acceptance</module>
+        <module>api</module>
+        <module>new-project-template-hello-api-lambda</module>
+        <module>terraform-acceptance</module>
+        <module>terraform-application</module>
+        <module>terraform-build</module>
+        <module>terraform-release</module>
+    </modules>
+
+    <scm>
+        <connection>scm:git:https://github.com/vector-technology-services/nep-new-project-template.git</connection>
+        <developerConnection>scm:git:https://github.com/vector-technology-services/nep-new-project-template.git
+        </developerConnection>
+        <url>https://github.com/vector-technology-services/nep-new-project-template.git</url>
+        <tag>HEAD</tag>
+    </scm>
+</project>

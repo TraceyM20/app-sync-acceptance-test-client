@@ -1,0 +1,147 @@
+openapi: "3.0.3"
+
+info:
+  title: HelloService
+  description: Hello Service APIs
+  version: "1.0.0"
+
+paths:
+  /health:
+    get:
+      summary: Health
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        200:
+          $ref: '#/components/responses/HealthResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+  /health/secure:
+    get:
+      summary: Secure health
+      operationId: getSecureHealth
+      tags:
+        - Health
+      responses:
+        200:
+          $ref: '#/components/responses/HealthResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+  /helloworld:
+    post:
+      summary: introduction and greeting
+      operationId: sayHello
+      tags:
+        - Greeting
+      requestBody:
+        $ref: '#/components/requestBodies/IntroductionRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/GreetingResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  requestBodies:
+    IntroductionRequest:
+      description: introduce yourself
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Introduction'
+  responses:
+    HealthResponse:
+      description: The hello service is alive
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Health'
+    GreetingResponse:
+      description: The hello service have been successfully retrieved
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Greeting'
+    BadRequest:
+      description: The request has not been processed, request contained bad or unexpected parameter
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    KeyValue:
+      type: object
+      description: Key Value pairs
+      additionalProperties:
+        type: string
+    Params:
+      type: object
+      description: Params details
+      properties:
+        path:
+          $ref: '#/components/schemas/KeyValue'
+        querystring:
+          $ref: '#/components/schemas/KeyValue'
+        header:
+          $ref: '#/components/schemas/KeyValue'
+    Context:
+      type: object
+      description: Context details
+      properties:
+        http-method:
+          type: string
+        source-ip:
+          type: string
+        user:
+          type: string
+        user-agent:
+          type: string
+        user-arn:
+          type: string
+        request-id:
+          type: string
+        resource-path:
+          type: string
+    Health:
+      type: object
+      properties:
+        path:
+          $ref: '#/components/schemas/Params'
+        context:
+          $ref: '#/components/schemas/Context'
+    Introduction:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+    Greeting:
+      type: object
+      required:
+        - output
+      properties:
+        output:
+          type: string
+    ErrorDetail:
+      type: object
+      description: Details for the error scenario
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      description: Response container for the error scenario
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'

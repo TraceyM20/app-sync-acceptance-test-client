@@ -1,0 +1,106 @@
+version: 0.2
+
+env:
+  variables:
+    SONARCLOUD_PROJECT_KEY: ${git_project_name}
+    GITHUB_REPO: ${github_repo}
+  secrets-manager:
+    MAVEN_SETTINGS_PATH: ${maven_settings_path}
+    JFROG_RELEASE_REPO: ${jfrog_secret_release_repo}
+    JFROG_SNAPSHOT_REPO: ${jfrog_secret_snapshot_repo}
+    JFROG_RELEASE_LOCAL_REPO: ${jfrog_secret_release_local_repo}
+    JFROG_SNAPSHOT_LOCAL_REPO: ${jfrog_secret_snapshot_local_repo}
+    JFROG_USERNAME: ${jfrog_secret_username}
+    JFROG_TOKEN: ${jfrog_secret_token}
+    SONARCLOUD_SCANNER_ZIP: ${sonarcloud_secret_sonarcloud_scanner_zip}
+    SONARCLOUD_SETTINGS: ${sonarcloud_secret_sonarcloud_settings_path}
+    SONARCLOUD_ENDPOINT: ${sonarcloud_secret_sonarcloud_endpoint}
+    SONARCLOUD_ORGANISATION: ${sonarcloud_secret_sonarcloud_organisation}
+    SONARCLOUD_TOKEN: ${sonarcloud_secret_sonarcloud_token}
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+    commands:
+      - mkdir -p ~/.m2
+      - aws s3 cp $${MAVEN_SETTINGS_PATH} ~/.m2/settings.xml
+      - echo "ACTOR_ACCOUNT_ID=$${CODEBUILD_WEBHOOK_ACTOR_ACCOUNT_ID}"
+      - ls -al
+      - >
+        if [ -z $${CODEBUILD_WEBHOOK_HEAD_REF} ]; then
+          export GIT_BRANCH=$${CODEBUILD_SOURCE_VERSION};
+        else
+          export GIT_BRANCH=$${CODEBUILD_WEBHOOK_HEAD_REF#"refs/heads/"};
+        fi
+      - >
+        GIT_BASE_BRANCH=$${CODEBUILD_WEBHOOK_BASE_REF#"refs/heads/"}
+      - >
+        echo "Base branch: $${GIT_BASE_BRANCH}"
+      - >
+        echo "Switching to branch: $${GIT_BRANCH}"
+      - git checkout $${GIT_BRANCH}
+      - git branch -u origin/$${GIT_BRANCH}
+      - export MAVEN_OPTS='--add-exports=java.base/jdk.internal.module=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED'
+      - mvn clean package
+      - >
+        SONARCLOUD_PROJECT_VERSION=`mvn exec:exec -Dexec.executable=echo -Dexec.args='$${project.version}' --non-recursive --quiet`
+      - >
+        SONAR_SOURCES=`find .
+        -path "*src/main/java"
+        -not -path ""
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - >
+        SONAR_TESTS=`find .
+        -path "*src/test/java"
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - >
+        SONAR_JAVA_BINARIES=`find .
+        -path "*/target"
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - >
+        SONAR_JACOCO_REPORTS=`find .
+        -name "jacoco.xml"
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - >
+        SONAR_PULL_REQUEST_KEY=$${CODEBUILD_WEBHOOK_TRIGGER#"pr/"}
+      - echo $${SONAR_PULL_REQUEST_KEY}
+      - SONAR_EXCLUSIONS='**/*Configuration.*,**/*Configuration$*.*,**/*RequestHandler.*,**/*Application.*,**/mapper/*MapperImpl.*,**/Dagger**'
+      - SONARCLOUD_PROJECT_VERSION=$${VERSION_NUMBER}-$${GIT_BRANCH}
+      - aws s3 cp --no-progress $${SONARCLOUD_SCANNER_ZIP} sonar-scanner-cli.zip
+      - unzip sonar-scanner-cli.zip
+      - aws s3 cp --no-progress $${SONARCLOUD_SETTINGS} sonar-scanner.properties
+      - envsubst < sonar-scanner.properties > sonar-scanner-5.0.1.3006-linux/conf/sonar-scanner.properties
+      - >
+        cat >> sonar-scanner-5.0.1.3006-linux/conf/sonar-scanner.properties << EOF
+          sonar.pullrequest.base=$${GIT_BASE_BRANCH}
+          sonar.pullrequest.branch=$${GIT_BRANCH}
+          sonar.pullrequest.provider=GitHub
+          sonar.pullrequest.key=$${SONAR_PULL_REQUEST_KEY}
+          sonar.pullrequest.github.endpoint=https://api.github.com
+          sonar.pullrequest.github.repository=$${GITHUB_REPO}
+        EOF
+      - >
+        cat > fetch-sonar-result.sh << EOF
+          #!/usr/bin/env bash
+          URL=\$(sed -n 's/^ceTaskUrl=//p' .scannerwork/report-task.txt)
+          TASK_STATUS=\$(curl -su \$SONARCLOUD_TOKEN: \$URL | jq -r .task.status)
+          while [ "\$TASK_STATUS" == "PENDING" ] || [ "\$TASK_STATUS" == "IN_PROGRESS" ]; do
+              sleep 5
+              TASK_STATUS=\$(curl -su \$SONARCLOUD_TOKEN: \$URL | jq -r .task.status)
+          done
+          echo "Task Status: \$TASK_STATUS"
+          [ "\$TASK_STATUS" != "SUCCESS" ] && exit 1
+          PROJECT_STATUS=\$(curl -su \$SONARCLOUD_TOKEN: \$SONARCLOUD_ENDPOINT/api/qualitygates/project_status?projectKey=\$SONARCLOUD_PROJECT_KEY\&pullRequest=\$SONAR_PULL_REQUEST_KEY | jq -r .projectStatus.status)
+          echo "Project Status: \$PROJECT_STATUS"
+          [ "\$PROJECT_STATUS" == "OK" ] && exit 0 || exit 1
+        EOF
+  build:
+    commands:
+      - sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner
+      - bash fetch-sonar-result.sh
+
+cache:
+  paths:
+    - '/root/.m2/**/*'
+    - '/root/.sonar/cache'

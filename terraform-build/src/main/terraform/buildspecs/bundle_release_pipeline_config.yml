@@ -1,0 +1,34 @@
+version: 0.2
+
+env:
+  variables:
+    # MAVEN_VERSION_NUMBER: is set as an environment variable by the code pipeline
+    RELEASE_BUCKET_NAME: ${release_bucket_name}
+    RELEASE_PIPELINE_BUCKET_NAME: ${release_pipeline_bucket_name}
+    APPLICATION_CONFIG_PATH: ${application_config_path}
+    PIPELINE_SOURCE_FILENAME: "application-bundle.zip"
+    TERRAFORM_CONFIG_FILENAME: "app_terraform.tf"
+    RELEASE_PROPERTIES_FILENAME: "release-properties.json"
+    ADDITIONAL_CONFIG_FILENAME: "config-new-project-template.json"
+
+phases:
+  install:
+    commands:
+      - aws s3 cp --no-progress s3://$RELEASE_BUCKET_NAME/dependencies/bin/terraform-1.0.0 terraform
+      - >
+        cat > $${TERRAFORM_CONFIG_FILENAME} << EOF
+          ${terraform_tf}
+        EOF
+      - >
+        cat > $${RELEASE_PROPERTIES_FILENAME} << EOF
+          ${release_properties_json}
+        EOF
+      - >
+        cat > $${ADDITIONAL_CONFIG_FILENAME} << EOF
+          ${config_json}
+        EOF
+  build:
+    commands:
+      - zip -r $${PIPELINE_SOURCE_FILENAME} terraform $${TERRAFORM_CONFIG_FILENAME} $${ADDITIONAL_CONFIG_FILENAME} release/**/*
+      - echo "uploading application bundle to $${APPLICATION_CONFIG_PATH}"
+      - aws s3 cp --no-progress $${PIPELINE_SOURCE_FILENAME} s3://$${RELEASE_PIPELINE_BUCKET_NAME}/$${APPLICATION_CONFIG_PATH}

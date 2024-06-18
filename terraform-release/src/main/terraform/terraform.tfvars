@@ -1,0 +1,16 @@
+cost_group = "meteringau-nep"
+#log_level = "INFO"
+log_retention_days = 7
+service_name = "vts-nep"
+component_name = "new-project-template"
+owner = "nep.operations@vector.co.nz"
+environment = "dev"
+created_by = "manual"
+config_s3_name = "mdm-test-4"
+application_config_path = "project_template/input.zip"
+management_kms_arn = "arn:aws:kms:ap-southeast-2:091893567291:key/5fdcb124-6a70-46ff-9d11-17ae9397181f"
+number_of_lambda_versions_to_keep = 3
+number_of_api_deployments_to_keep = 3
+application_kms_arn                 = "arn:aws:kms:ap-southeast-2:091893567291:key/ba0822d1-7dee-4c5d-8948-ebbe86e27617"
+environment_remote_state_bucket_arn = "arn:aws:s3:::vams-au-multi-fuel-api-sandbox-dev-terraform-remote-state-s3"
+environment_remote_state_table_arn =  "arn:aws:dynamodb:ap-southeast-2:091893567291:table/vams-au-multi-fuel-api-sandbox-dev-terraform-remote-state-table"

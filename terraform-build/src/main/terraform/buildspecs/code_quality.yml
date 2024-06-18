@@ -1,0 +1,62 @@
+version: 0.2
+
+env:
+  variables:
+    SONARCLOUD_PROJECT_KEY: ${git_project_name}
+    # MAVEN_VERSION_NUMBER: is set as an environment variable by the code pipeline
+  secrets-manager:
+    SONARCLOUD_SCANNER_ZIP: ${sonarcloud_secret_sonarcloud_scanner_zip}
+    SONARCLOUD_SETTINGS: ${sonarcloud_secret_sonarcloud_settings_path}
+    SONARCLOUD_ENDPOINT: ${sonarcloud_secret_sonarcloud_endpoint}
+    SONARCLOUD_ORGANISATION: ${sonarcloud_secret_sonarcloud_organisation}
+    SONARCLOUD_TOKEN: ${sonarcloud_secret_sonarcloud_token}
+
+phases:
+  install:
+    commands:
+      - >
+        SONAR_SOURCES=`find .
+        -path "*src/main/java"
+        -not -path ""
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - >
+        SONAR_TESTS=`find .
+        -path "*src/test/java"
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - >
+        SONAR_JAVA_BINARIES=`find .
+        -path "*/target"
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - >
+        SONAR_JACOCO_REPORTS=`find .
+        -name "jacoco.xml"
+        -exec echo -n {}, \; | sed 's/,$//'`
+      - SONAR_EXCLUSIONS='**/*Configuration.*,**/*Configuration$*.*,**/*RequestHandler.*,**/*Application.*,**/mapper/*MapperImpl.*,**/Dagger**'
+      - SONARCLOUD_PROJECT_VERSION=$${MAVEN_VERSION_NUMBER}
+      - aws s3 cp --no-progress $${SONARCLOUD_SCANNER_ZIP} sonar-scanner-cli.zip
+      - unzip sonar-scanner-cli.zip
+      - aws s3 cp --no-progress $${SONARCLOUD_SETTINGS} sonar-scanner.properties
+      - envsubst < sonar-scanner.properties > sonar-scanner-5.0.1.3006-linux/conf/sonar-scanner.properties
+      - >
+        cat > fetch-sonar-result.sh << EOF
+          #!/usr/bin/env bash
+          URL=\$(sed -n 's/^ceTaskUrl=//p' .scannerwork/report-task.txt)
+          TASK_STATUS=\$(curl -su \$SONARCLOUD_TOKEN: \$URL | jq -r .task.status)
+          while [ "\$TASK_STATUS" == "PENDING" ] || [ "\$TASK_STATUS" == "IN_PROGRESS" ]; do
+              sleep 5
+              TASK_STATUS=\$(curl -su \$SONARCLOUD_TOKEN: \$URL | jq -r .task.status)
+          done
+          echo "Task Status: \$TASK_STATUS"
+          [ "\$TASK_STATUS" != "SUCCESS" ] && exit 1
+          PROJECT_STATUS=\$(curl -su \$SONARCLOUD_TOKEN: \$SONARCLOUD_ENDPOINT/api/qualitygates/project_status?projectKey=\$SONARCLOUD_PROJECT_KEY | jq -r .projectStatus.status)
+          echo "Project Status: \$PROJECT_STATUS"
+          [ "\$PROJECT_STATUS" == "OK" ] && exit 0 || exit 1
+        EOF
+  build:
+    commands:
+      - sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner
+      - bash fetch-sonar-result.sh
+
+cache:
+  paths:
+    - '/root/.sonar/cache'

@@ -1,0 +1,45 @@
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    # RELEASE_PIPELINE_NAME: is set as an environment variable by the code pipeline
+    PIPELINE_EXECUTION_DELAYED_START: 5
+
+phases:
+  build:
+    commands:
+      - echo "Triggering pipeline $${RELEASE_PIPELINE_NAME}"
+      - EXECUTION_ID=$(aws codepipeline start-pipeline-execution --name $${RELEASE_PIPELINE_NAME} | jq -r '.pipelineExecutionId')
+      - echo "Retrieving pipeline execution info for $EXECUTION_ID"
+      - sleep $${PIPELINE_EXECUTION_DELAYED_START}
+      - PIPELINE_STATUS=$(aws codepipeline get-pipeline-execution --pipeline-name $${RELEASE_PIPELINE_NAME} --pipeline-execution-id $EXECUTION_ID | jq -r '.pipelineExecution.status')
+      - echo "execution info for $EXECUTION_ID has a pipeline status of $PIPELINE_STATUS"
+      - |
+        if [[ "$PIPELINE_STATUS" != 'InProgress' ]];
+        then
+          echo "Pipeline was unable to be executed completely." && exit 1
+        fi
+      - |
+        while [[ "$PIPELINE_STATUS" == 'InProgress' ]];
+          do
+          sleep 15
+          echo "Checking pipeline status."
+          STATUS=$(aws codepipeline get-pipeline-execution --pipeline-name $${RELEASE_PIPELINE_NAME} --pipeline-execution-id $EXECUTION_ID | jq -r '.pipelineExecution.status')
+          echo "The current status is $STATUS"
+          PIPELINE_STATUS="$STATUS"
+          echo "Pipeline status is $PIPELINE_STATUS"
+          if [[ "$PIPELINE_STATUS" == 'InProgress' ]];
+          then
+            echo "Build is still in progress, waiting..."
+          fi
+        done
+      - |
+        if [[ "$PIPELINE_STATUS" != 'Succeeded' ]];
+        then
+          echo "Pipeline status did not succeed, its final status was $PIPELINE_STATUS"
+          exit 1
+        else
+          echo "Pipeline succeeded"
+        fi
+      - echo "pipeline completed successfully"
